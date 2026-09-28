@@ -65,6 +65,7 @@ export default function App() {
     dashAvailable: true,
     specialMeter: 35,
     specialReady: false,
+    combo: 0,
   });
 
   const [weapons, setWeapons] = useState<WeaponInfo[]>([]);
@@ -118,9 +119,13 @@ export default function App() {
               setHasCustomModel(true);
               setUseCustomModel(true);
               setAvailableAnimations(res.animations);
+              const calibratedScale = res.appliedScale !== undefined ? res.appliedScale : savedConfig.scale;
+              const calibratedYOffset = res.appliedYOffset !== undefined ? res.appliedYOffset : savedConfig.yOffset;
               setCustomModelConfig((prev) => ({
                 ...prev,
                 modelName: stored.name,
+                scale: calibratedScale,
+                yOffset: calibratedYOffset,
               }));
             }
           })
@@ -311,6 +316,8 @@ export default function App() {
         const newConfig = {
           ...customModelConfig,
           modelName: file.name,
+          scale: res.appliedScale !== undefined ? res.appliedScale : 1.0,
+          yOffset: res.appliedYOffset !== undefined ? res.appliedYOffset : 0.0,
         };
         setCustomModelConfig(newConfig);
         saveModelConfig(newConfig);
@@ -421,8 +428,8 @@ export default function App() {
 
         {/* Virtual Joystick in the Center ("joystick al centro") with ample clearance */}
         {gameState === 'PLAYING' && !isPaused && (
-          <div className="absolute bottom-6 sm:bottom-8 left-1/2 -translate-x-1/2 z-30 pointer-events-auto">
-            <VirtualJoystick onMove={handleJoystickMove} size={135} />
+          <div className="absolute bottom-24 sm:bottom-32 left-1/2 -translate-x-1/2 z-30 pointer-events-auto">
+            <VirtualJoystick onMove={handleJoystickMove} size={160} />
           </div>
         )}
 

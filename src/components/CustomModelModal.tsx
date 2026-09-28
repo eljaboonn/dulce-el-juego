@@ -85,8 +85,8 @@ export const CustomModelModal: React.FC<CustomModelModalProps> = ({
   };
 
   return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-fadeIn select-none font-sans">
-      <div className="w-full max-w-md max-h-[90vh] bg-gradient-to-b from-[#250d30] via-[#1a0822] to-[#0e0314] rounded-3xl border-2 border-pink-500/70 shadow-[0_12px_45px_rgba(236,72,153,0.5)] p-5 flex flex-col gap-4 text-left overflow-y-auto">
+    <div className="absolute inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-[2px] animate-fadeIn select-none font-sans">
+      <div className="w-full max-w-md max-h-[90vh] bg-gradient-to-b from-[#250d30]/95 via-[#1a0822]/95 to-[#0e0314]/95 rounded-3xl border-2 border-pink-500/70 shadow-[0_12px_45px_rgba(236,72,153,0.5)] p-5 flex flex-col gap-4 text-left overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-pink-500/30 pb-3">
           <div className="flex items-center gap-2">
@@ -211,13 +211,20 @@ export const CustomModelModal: React.FC<CustomModelModalProps> = ({
               </div>
               <input
                 type="range"
-                min="0.1"
+                min="0.2"
                 max="3.0"
                 step="0.05"
                 value={currentConfig.scale}
                 onChange={(e) => onUpdateConfig({ scale: parseFloat(e.target.value) })}
                 className="w-full accent-pink-500 cursor-pointer"
               />
+              <button
+                type="button"
+                onClick={() => onUpdateConfig({ scale: 1.0 })}
+                className="mt-1 w-full py-1 text-[10px] font-bold rounded-lg bg-pink-950/70 border border-pink-400/40 text-pink-200 hover:bg-pink-900/60 transition-colors cursor-pointer"
+              >
+                Restablecer Escala Automática Normalizada (1.00x)
+              </button>
             </div>
 
             {/* Vertical Y Offset Slider */}

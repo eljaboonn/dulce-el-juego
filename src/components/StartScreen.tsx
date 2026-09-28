@@ -15,7 +15,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({
   modelName,
 }) => {
   return (
-    <div className="absolute inset-0 z-50 flex flex-col justify-between p-6 bg-gradient-to-b from-[#250d30]/95 via-[#180620]/95 to-[#2a0e36] backdrop-blur-md text-white select-none">
+    <div className="absolute inset-0 z-50 flex flex-col justify-between p-4 sm:p-6 bg-gradient-to-b from-[#1c0824]/90 via-[#0e0214]/40 to-[#1c0824]/90 backdrop-blur-[2px] text-white select-none">
       {/* Top Brand / Title */}
       <div className="flex flex-col items-center text-center mt-3">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-pink-400/50 bg-pink-950/60 text-xs font-bold text-pink-300 tracking-wider mb-2 shadow-[0_0_15px_rgba(244,114,182,0.4)]">

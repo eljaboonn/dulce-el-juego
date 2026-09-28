@@ -47,6 +47,7 @@ export interface PlayerStats {
   dashAvailable: boolean;
   specialMeter: number; // 0 to 100
   specialReady: boolean;
+  combo: number;
 }
 
 export type EnemyType = 'CUPCAKE' | 'GUMMY_BEAR' | 'GINGERBREAD' | 'JAWBREAKER' | 'CAKEZILLA_BOSS';

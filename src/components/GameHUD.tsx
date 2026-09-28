@@ -265,6 +265,22 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             </span>
             <span className="text-[9px] text-pink-200/70 font-bold">· ☠ {stats.totalKills}</span>
           </div>
+          {stats.combo > 1 && (
+            <div className="absolute top-16 left-1/2 -translate-x-1/2 flex flex-col items-center">
+              <span
+                className="font-black text-transparent bg-clip-text animate-pulse"
+                style={{
+                  fontSize: `${Math.min(3, 1 + stats.combo * 0.1)}rem`,
+                  backgroundImage: `linear-gradient(to right, #f43f5e, ${
+                    stats.combo > 10 ? '#fb7185' : '#facc15'
+                  })`,
+                  textShadow: '0 0 10px rgba(0,0,0,0.5)',
+                }}
+              >
+                {stats.combo}x COMBO!
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Top-Center: Candy Coins Counter (Moved here from bottom to uncrowd the joystick and buttons!) */}
@@ -362,7 +378,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           {/* Weapon Slot 1: Ametralladora Dulce (Rifle de combate) */}
           <button
             onClick={() => onSwitchWeapon('AMETRALLADORA')}
-            className={`relative w-16 h-16 rounded-2xl border-2 p-1.5 flex items-center justify-center transition-all cursor-pointer ${
+            className={`relative w-12 h-12 rounded-2xl border-2 p-1 flex items-center justify-center transition-all cursor-pointer ${
               isMetralleta
                 ? 'border-pink-400 bg-[#280c2e] shadow-[0_0_16px_rgba(244,63,94,0.7)] scale-105 ring-2 ring-pink-300/60'
                 : 'border-slate-700 bg-black/60 opacity-60 hover:opacity-90'
@@ -370,7 +386,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             title="Equipar Ametralladora (Rifle en manos, Machete en cadera)"
           >
             <div className="relative w-full h-full flex items-center justify-center">
-              <svg viewBox="0 0 100 100" className="w-11 h-11 drop-shadow-md">
+              <svg viewBox="0 0 100 100" className="w-8 h-8 drop-shadow-md">
                 <rect x="10" y="44" width="16" height="5" rx="1.5" fill="#475569" />
                 <rect x="24" y="38" width="46" height="14" rx="2" fill="#1e293b" />
                 <rect x="26" y="35" width="42" height="3" fill="#ff2b75" />
@@ -384,13 +400,9 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                 <polygon points="90,45 96,41 93,45 98,45 93,48 97,52 90,47" fill="#facc15" />
               </svg>
             </div>
-            {/* Ammo Badge */}
-            <div className="absolute -top-2.5 -right-1 bg-gradient-to-r from-pink-600 to-rose-500 border border-white text-[8px] font-black text-white px-2 py-0.5 rounded-full shadow-xs">
-              {stats.isReloading ? 'REC...' : `${stats.currentAmmo}/${stats.maxAmmo}`}
-            </div>
             {isMetralleta && (
               <span className="absolute -bottom-2 px-1.5 bg-pink-500 text-white text-[7px] font-bold rounded-sm uppercase tracking-tight shadow-xs">
-                EN MANOS
+                EQUIP
               </span>
             )}
           </button>
@@ -398,7 +410,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
           {/* Weapon Slot 2: Machete Azucarado */}
           <button
             onClick={() => onSwitchWeapon('MACHETE')}
-            className={`relative w-16 h-16 rounded-2xl border-2 p-1.5 flex items-center justify-center transition-all cursor-pointer ${
+            className={`relative w-12 h-12 rounded-2xl border-2 p-1 flex items-center justify-center transition-all cursor-pointer ${
               isMachete
                 ? 'border-pink-400 bg-[#280c2e] shadow-[0_0_16px_rgba(244,63,94,0.7)] scale-105 ring-2 ring-pink-300/60'
                 : 'border-slate-700 bg-black/60 opacity-60 hover:opacity-90'
@@ -406,7 +418,7 @@ export const GameHUD: React.FC<GameHUDProps> = ({
             title="Equipar Machete (Machete en mano, Rifle en espalda)"
           >
             <div className="relative w-full h-full flex items-center justify-center">
-              <svg viewBox="0 0 100 100" className="w-11 h-11 -rotate-12 drop-shadow-md">
+              <svg viewBox="0 0 100 100" className="w-8 h-8 -rotate-12 drop-shadow-md">
                 <path d="M28 70 L68 22 Q78 18 84 24 Q86 34 76 46 L40 82 Z" fill="#ffffff" stroke="#cbd5e1" strokeWidth="2" />
                 <path d="M38 80 L74 44 Q84 32 82 24" stroke="#ff2b75" strokeWidth="4" strokeLinecap="round" fill="none" />
                 <path d="M28 70 L18 80 Q14 84 18 88 Q22 92 26 88 L38 78 Z" fill="#dc2626" stroke="#991b1b" strokeWidth="2" />
@@ -415,12 +427,9 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                 <polygon points="78,16 80,21 85,21 81,24 83,29 78,26 74,29 76,24 71,21 76,21" fill="#facc15" />
               </svg>
             </div>
-            <div className="absolute -top-2.5 -right-1 bg-emerald-600 border border-white text-[8px] font-black text-white px-2 py-0.5 rounded-full shadow-xs">
-              MELEE
-            </div>
             {isMachete && (
               <span className="absolute -bottom-2 px-1.5 bg-pink-500 text-white text-[7px] font-bold rounded-sm uppercase tracking-tight shadow-xs">
-                EN MANO
+                EQUIP
               </span>
             )}
           </button>
@@ -429,37 +438,21 @@ export const GameHUD: React.FC<GameHUDProps> = ({
         {/* Center Area: Completely clear to give the Virtual Joystick unobstructed room! */}
         <div className="flex-1 pointer-events-none" />
 
-        {/* Bottom-Right: Spacious Action Controls (No crowding!) */}
+        {/* Bottom-Right: Special Candy & Dash Buttons cleanly spaced */}
         <div className="flex flex-col items-end gap-3.5 pointer-events-auto pr-2 pb-2">
-          {/* Secondary Row: Reload, Special Candy & Dash Buttons cleanly spaced */}
           <div className="flex items-center gap-3">
-            {/* Manual Reload button for Ametralladora */}
-            {isMetralleta && (
-              <button
-                onClick={onReload}
-                disabled={stats.isReloading || stats.currentAmmo >= stats.maxAmmo}
-                className={`p-2.5 rounded-full border border-pink-400/60 bg-black/75 text-pink-300 shadow-md active:scale-95 transition-all cursor-pointer ${
-                  stats.isReloading || stats.currentAmmo >= stats.maxAmmo ? 'opacity-40' : 'hover:bg-pink-900/40'
-                }`}
-                title="Recargar Munición"
-              >
-                <RotateCw className={`w-4 h-4 ${stats.isReloading ? 'animate-spin text-amber-400' : ''}`} />
-              </button>
-            )}
-
             {/* Special Ability Button with Melting Candy Icon */}
             <button
               onClick={onSpecial}
               disabled={!stats.specialReady}
-              className={`relative w-13 h-13 rounded-full border-2 p-1.5 flex items-center justify-center transition-all cursor-pointer ${
+              className={`relative w-12 h-12 rounded-full border-2 p-1.5 flex items-center justify-center transition-all cursor-pointer ${
                 stats.specialReady
                   ? 'border-yellow-300 bg-gradient-to-tr from-pink-600 via-rose-500 to-amber-400 shadow-[0_0_22px_rgba(244,63,94,0.95),0_0_32px_rgba(250,204,21,0.7)] scale-105 active:scale-95 animate-pulse'
                   : 'border-pink-900/60 bg-black/70 text-slate-500 opacity-50'
               }`}
               title="Habilidad Especial: Explosión de Dulces"
             >
-              {/* Sweet Candy Vector Icon */}
-              <svg viewBox="0 0 100 100" className="w-8 h-8 drop-shadow-md">
+              <svg viewBox="0 0 100 100" className="w-7 h-7 drop-shadow-md">
                 <polygon points="12,32 30,50 12,68 18,50" fill={stats.specialReady ? '#facc15' : '#64748b'} />
                 <polygon points="88,32 70,50 88,68 82,50" fill={stats.specialReady ? '#facc15' : '#64748b'} />
                 <ellipse cx="50" cy="50" rx="24" ry="20" fill={stats.specialReady ? '#f43f5e' : '#475569'} />
@@ -468,79 +461,8 @@ export const GameHUD: React.FC<GameHUDProps> = ({
                 <path d="M54 32 Q62 50 54 68" stroke="#ffffff" strokeWidth="3" fill="none" opacity="0.85" />
                 <circle cx="44" cy="42" r="3" fill="#ffffff" />
               </svg>
-
-              {/* Ready ping badge */}
-              {stats.specialReady && (
-                <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-yellow-400 border border-white flex items-center justify-center text-[8px] font-black text-rose-950">
-                  ★
-                </div>
-              )}
-            </button>
-
-            {/* Dash / Evade Button with ample spacing */}
-            <button
-              onClick={onDash}
-              disabled={!stats.dashAvailable}
-              className={`relative w-13 h-13 rounded-full border-2 border-white/85 bg-gradient-to-tr from-slate-800 to-slate-900 flex items-center justify-center shadow-md active:scale-90 transition-all cursor-pointer ${
-                !stats.dashAvailable ? 'opacity-40 grayscale' : 'hover:border-cyan-400 shadow-[0_0_12px_rgba(6,182,212,0.4)]'
-              }`}
-              title="Esquivar (Dash)"
-            >
-              <svg viewBox="0 0 24 24" className="w-5.5 h-5.5 fill-none stroke-cyan-300 stroke-2">
-                <path d="M5 12h14M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              {!stats.dashAvailable && stats.dashCooldown > 0 && (
-                <div className="absolute inset-0 rounded-full bg-black/75 flex items-center justify-center font-bold text-[10px] text-white">
-                  {stats.dashCooldown.toFixed(1)}s
-                </div>
-              )}
             </button>
           </div>
-
-          {/* Primary Action Button (Bala cuando tiene Ametralladora, Machete cuando tiene Machete) */}
-          <button
-            onPointerDown={onAttackStart}
-            onPointerUp={onAttackEnd}
-            onPointerLeave={onAttackEnd}
-            className={`relative w-21 h-21 sm:w-22 sm:h-22 rounded-full border-4 border-white/95 flex flex-col items-center justify-center shadow-[0_8px_24px_rgba(244,63,94,0.7)] active:scale-90 transition-all select-none cursor-pointer ${
-              isMetralleta
-                ? 'bg-gradient-to-tr from-rose-900 via-pink-600 to-rose-400 ring-2 ring-pink-400/60'
-                : 'bg-gradient-to-tr from-emerald-950 via-teal-700 to-emerald-500 ring-2 ring-emerald-400/60'
-            }`}
-            title={isMetralleta ? 'Disparar Ametralladora' : 'Atacar con Machete'}
-          >
-            {isMetralleta ? (
-              <>
-                {/* Bullet (Bala) Vector Icon */}
-                <svg viewBox="0 0 100 100" className="w-12 h-12 drop-shadow-md -mt-1">
-                  <path d="M38 52 L38 82 Q38 86 50 86 Q62 86 62 82 L62 52 Z" fill="#facc15" stroke="#ca8a04" strokeWidth="2" />
-                  <rect x="36" y="74" width="28" height="3" rx="1" fill="#a16207" />
-                  <path d="M38 52 C38 34 44 18 50 14 C56 18 62 34 62 52 Z" fill="#ec4899" stroke="#be185d" strokeWidth="2" />
-                  <path d="M43 28 Q46 22 50 20" stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" fill="none" opacity="0.9" />
-                  <polygon points="50,6 52,11 58,11 53,15 55,20 50,17 45,20 47,15 42,11 48,11" fill="#ffffff" />
-                </svg>
-                <span className="text-[9px] font-black text-white uppercase tracking-wider -mt-1 drop-shadow-sm">
-                  {stats.isReloading ? 'RECARGA' : 'DISPARAR'}
-                </span>
-                {stats.isReloading && (
-                  <div className="absolute inset-0 rounded-full border-4 border-amber-300 border-t-transparent animate-spin pointer-events-none" />
-                )}
-              </>
-            ) : (
-              <>
-                {/* Machete Vector Icon */}
-                <svg viewBox="0 0 100 100" className="w-12 h-12 -rotate-12 drop-shadow-md -mt-1">
-                  <path d="M28 70 L68 22 Q78 18 84 24 Q86 34 76 46 L40 82 Z" fill="#ffffff" stroke="#cbd5e1" strokeWidth="2" />
-                  <path d="M38 80 L74 44 Q84 32 82 24" stroke="#ff2b75" strokeWidth="4" strokeLinecap="round" fill="none" />
-                  <path d="M28 70 L18 80 Q14 84 18 88 Q22 92 26 88 L38 78 Z" fill="#dc2626" stroke="#991b1b" strokeWidth="2" />
-                  <polygon points="78,16 80,21 85,21 81,24 83,29 78,26 74,29 76,24 71,21 76,21" fill="#facc15" />
-                </svg>
-                <span className="text-[9px] font-black text-white uppercase tracking-wider -mt-1 drop-shadow-sm">
-                  CORTAR
-                </span>
-              </>
-            )}
-          </button>
         </div>
       </div>
     </div>

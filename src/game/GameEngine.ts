@@ -112,6 +112,12 @@ export class GameEngine {
     leftFoot?: THREE.Object3D;
   } | null = null;
   private useCustomModel: boolean = false;
+  private customModelBaseScale: number = 1.0;
+  private customModelOriginOffset = {
+    rawCenterX: 0,
+    rawCenterZ: 0,
+    rawMinY: 0,
+  };
   private customModelOptions = {
     scale: 1.0,
     yOffset: 0.0,
@@ -249,7 +255,9 @@ export class GameEngine {
 
     const width = container.clientWidth || 390;
     const height = container.clientHeight || 844;
-    this.camera = new THREE.PerspectiveCamera(58, width / height, 0.1, 120);
+    this.camera = new THREE.PerspectiveCamera(54, width / height, 0.1, 150);
+    this.camera.position.set(0, 4.2, 7.5);
+    this.camera.lookAt(0, 1.8, 0);
 
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
     this.renderer.setSize(width, height);
@@ -512,7 +520,7 @@ export class GameEngine {
   public async loadCustomModelFromBuffer(
     buffer: ArrayBuffer,
     initialConfig?: { scale?: number; yOffset?: number; rotY?: number; showGun?: boolean }
-  ): Promise<{ success: boolean; animations: string[]; error?: string }> {
+  ): Promise<{ success: boolean; animations: string[]; appliedScale?: number; appliedYOffset?: number; error?: string }> {
     return new Promise((resolve) => {
       try {
         const loader = new GLTFLoader();
@@ -540,51 +548,121 @@ export class GameEngine {
             const model = gltf.scene;
             this.customModelScene = model;
 
+            // 1. Reset base transforms and prepare matrices
+            model.position.set(0, 0, 0);
+            model.rotation.set(0, 0, 0);
+            model.scale.set(1, 1, 1);
+            model.updateMatrixWorld(true);
+
+            // 2. Traverse all meshes and bones to optimize rendering, lighting and prevent frustum culling
             model.traverse((child) => {
-              if (child instanceof THREE.Mesh) {
-                child.castShadow = true;
-                child.receiveShadow = true;
+              if ((child as THREE.Mesh).isMesh) {
+                const mesh = child as THREE.Mesh;
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                // CRITICAL: Disable frustum culling on all character meshes to prevent disappearance during bone animation
+                mesh.frustumCulled = false;
+
+                const mats: THREE.Material[] = Array.isArray(mesh.material) ? mesh.material : (mesh.material ? [mesh.material] : []);
+                mats.forEach((mat: THREE.Material) => {
+                  if (mat) {
+                    mat.side = THREE.DoubleSide; // Render both sides to avoid backface culling
+                    if (mat instanceof THREE.MeshStandardMaterial) {
+                      // Prevent pitch black reflections when no HDRI environment map exists
+                      if (mat.metalness > 0.45 && !mat.metalnessMap) {
+                        mat.metalness = 0.2;
+                      }
+                      if (mat.roughness < 0.2) {
+                        mat.roughness = 0.45;
+                      }
+                      // If completely black color with no texture, brighten slightly
+                      if (mat.color && mat.color.r === 0 && mat.color.g === 0 && mat.color.b === 0 && !mat.map) {
+                        mat.color.set('#d4d4d8');
+                      }
+                    }
+                    mat.needsUpdate = true;
+                  }
+                });
+              }
+
+              if ((child as THREE.Bone).isBone) {
+                child.matrixAutoUpdate = true;
               }
             });
 
-            const box = new THREE.Box3().setFromObject(model);
-            const size = new THREE.Vector3();
-            box.getSize(size);
-
-            let autoScale = 1.0;
-            if (size.y > 0.05) {
-              autoScale = 3.3 / size.y;
+            // 3. Compute Raw Bounding Box & Dimensions across all geometries and bones
+            const rawBox = new THREE.Box3().setFromObject(model);
+            if (rawBox.isEmpty() || !isFinite(rawBox.min.x)) {
+              model.traverse((child) => {
+                if ((child as THREE.Mesh).isMesh && (child as THREE.Mesh).geometry) {
+                  (child as THREE.Mesh).geometry.computeBoundingBox();
+                  const geomBox = (child as THREE.Mesh).geometry.boundingBox;
+                  if (geomBox) {
+                    rawBox.union(geomBox.clone().applyMatrix4(child.matrixWorld));
+                  }
+                }
+              });
             }
 
-            const finalScale = initialConfig?.scale ?? autoScale;
+            const rawSize = new THREE.Vector3();
+            rawBox.getSize(rawSize);
+            const rawCenter = new THREE.Vector3();
+            rawBox.getCenter(rawCenter);
+
+            // 4. Automatic Scale Adjustment (Requirement 2: reajustar de forma automática por código)
+            // Target character height in world coordinates is ~3.4 units (human scale in this arena)
+            const rawHeight = rawSize.y > 0.001 ? rawSize.y : Math.max(rawSize.x, rawSize.z, 0.1);
+            const TARGET_HEIGHT = 3.4;
+            const autoBaseScale = TARGET_HEIGHT / rawHeight;
+
+            this.customModelBaseScale = autoBaseScale;
+            this.customModelOriginOffset = {
+              rawCenterX: isFinite(rawCenter.x) ? rawCenter.x : 0,
+              rawCenterZ: isFinite(rawCenter.z) ? rawCenter.z : 0,
+              rawMinY: isFinite(rawBox.min.y) ? rawBox.min.y : 0,
+            };
+
+            // Determine safe scale multiplier: default 1.0 = exact 3.4 unit human height
+            let userScaleMultiplier = 1.0;
+            if (initialConfig?.scale && initialConfig.scale > 0) {
+              const testHeight = rawHeight * initialConfig.scale;
+              // If scale is a sensible multiplier or already calibrated:
+              if (initialConfig.scale >= 0.2 && initialConfig.scale <= 3.0 && (testHeight >= 1.2 && testHeight <= 6.0)) {
+                userScaleMultiplier = initialConfig.scale;
+              } else if (testHeight < 1.0 || testHeight > 6.5) {
+                // If it was microscopic (<1.0) or gigantic (>6.5), recalibrate automatically to 1.0x
+                userScaleMultiplier = 1.0;
+              }
+            }
+
+            const finalScale = autoBaseScale * userScaleMultiplier;
             const rotDeg = initialConfig?.rotY ?? 0;
             const showGun = initialConfig?.showGun ?? true;
+            const userYOffset = initialConfig?.yOffset !== undefined ? initialConfig.yOffset : 0.0;
 
-            // Apply scale and rotation to calculate exact ground level
+            // 5. Position mesh and bone hierarchy EXACTLY at the origin in front of the main camera (Requirement 1)
             model.scale.set(finalScale, finalScale, finalScale);
-            model.position.set(0, 0, 0);
+            // Center X and Z so origin is exactly centered at (0, 0)
+            model.position.x = -this.customModelOriginOffset.rawCenterX * finalScale;
+            model.position.z = -this.customModelOriginOffset.rawCenterZ * finalScale;
+            // Place feet precisely on floor y = 0
+            model.position.y = (-this.customModelOriginOffset.rawMinY * finalScale) + userYOffset;
             model.rotation.y = (rotDeg * Math.PI) / 180;
             model.updateMatrixWorld(true);
 
-            // Compute exact floor offset: places lowest vertex/feet precisely on floor y = 0
-            const scaledBox = new THREE.Box3().setFromObject(model);
-            const autoGroundY = -scaledBox.min.y;
-            const yOff = initialConfig?.yOffset !== undefined ? initialConfig.yOffset : autoGroundY;
-
             this.customModelOptions = {
-              scale: finalScale,
-              yOffset: yOff,
+              scale: userScaleMultiplier,
+              yOffset: userYOffset,
               rotY: rotDeg,
               showGun,
             };
 
-            model.position.set(0, yOff, 0);
             this.customModelGroup.add(model);
 
-            // 1. Detect and configure custom model skeleton bones
+            // 6. Detect and configure custom model skeleton bones
             this.customRigBones = this.detectAndConfigureCustomBones(model);
 
-            // 2. Setup Animations (Embedded in GLTF or Procedural Combat Stance)
+            // 7. Setup Animations (Embedded in GLTF or Procedural Combat Stance)
             const animNames: string[] = [];
             this.customMixer = null;
             this.customIdleAction = null;
@@ -602,7 +680,7 @@ export class GameEngine {
 
               // Broad search for combat/idle clip
               const idleClip =
-                gltf.animations.find((c) => /idle|stand|combat|ready|guard|pose|breath|wait/i.test(c.name)) ||
+                gltf.animations.find((c) => /idle|stand|combat|ready|guard|pose|breath|wait|static/i.test(c.name)) ||
                 gltf.animations[0];
               // Broad search for running/walking locomotion clip
               const runClip =
@@ -613,18 +691,18 @@ export class GameEngine {
 
               if (idleClip) {
                 this.customIdleAction = this.customMixer.clipAction(idleClip);
+                this.customIdleAction.setLoop(THREE.LoopRepeat, Infinity);
+                this.customIdleAction.play();
+                this.currentCustomAction = this.customIdleAction;
               }
               if (runClip) {
                 this.customRunAction = this.customMixer.clipAction(runClip);
+                this.customRunAction.setLoop(THREE.LoopRepeat, Infinity);
               }
               if (attackClip) {
                 this.customAttackAction = this.customMixer.clipAction(attackClip);
               }
 
-              if (this.customIdleAction) {
-                this.customIdleAction.play();
-                this.currentCustomAction = this.customIdleAction;
-              }
               this.hasEmbeddedClips = true;
             } else {
               this.hasEmbeddedClips = false;
@@ -632,7 +710,7 @@ export class GameEngine {
               this.applyInitialCombatStance();
             }
 
-            // 3. Attach weapons directly to the character's right hand and holster points
+            // 8. Attach weapons directly to the character's right hand and holster points
             if (showGun) {
               this.attachWeaponsToCustomModel();
             }
@@ -642,6 +720,8 @@ export class GameEngine {
             resolve({
               success: true,
               animations: animNames,
+              appliedScale: userScaleMultiplier,
+              appliedYOffset: userYOffset,
             });
           },
           (err) => {
@@ -949,12 +1029,11 @@ export class GameEngine {
     if (config.showGun !== undefined) this.customModelOptions.showGun = config.showGun;
 
     if (this.customModelScene) {
-      this.customModelScene.scale.set(
-        this.customModelOptions.scale,
-        this.customModelOptions.scale,
-        this.customModelOptions.scale
-      );
-      this.customModelScene.position.y = this.customModelOptions.yOffset;
+      const effectiveScale = this.customModelBaseScale * this.customModelOptions.scale;
+      this.customModelScene.scale.set(effectiveScale, effectiveScale, effectiveScale);
+      this.customModelScene.position.x = -this.customModelOriginOffset.rawCenterX * effectiveScale;
+      this.customModelScene.position.z = -this.customModelOriginOffset.rawCenterZ * effectiveScale;
+      this.customModelScene.position.y = (-this.customModelOriginOffset.rawMinY * effectiveScale) + this.customModelOptions.yOffset;
       this.customModelScene.rotation.y = (this.customModelOptions.rotY * Math.PI) / 180;
     }
 
@@ -1011,33 +1090,58 @@ export class GameEngine {
   // -------------------------------------------------------------
 
   private setupLighting() {
-    // Ambient light: Soft dreamy pastel candy purple/pink sky fill
-    const ambientLight = new THREE.AmbientLight('#7c2d8a', 2.2);
+    // 1. Iluminación Ambiental Brillante y Equilibrada (Neutral Ambient Light)
+    // Evita sombras empastadas y garantiza que todas las caras del modelo 3D sean nítidas y claras
+    const ambientLight = new THREE.AmbientLight('#ffffff', 1.8);
     this.scene.add(ambientLight);
 
-    // Key directional light: Glowing warm candy sunlight
-    const dirLight = new THREE.DirectionalLight('#fff0f6', 2.2);
-    dirLight.position.set(15, 30, 20);
-    dirLight.castShadow = true;
-    dirLight.shadow.mapSize.width = 1024;
-    dirLight.shadow.mapSize.height = 1024;
-    dirLight.shadow.camera.near = 5;
-    dirLight.shadow.camera.far = 80;
-    dirLight.shadow.camera.left = -25;
-    dirLight.shadow.camera.right = 25;
-    dirLight.shadow.camera.top = 25;
-    dirLight.shadow.camera.bottom = -25;
-    this.scene.add(dirLight);
+    // 2. Luz Hemisférica: cielo blanco puro con suave reflejo cálido desde el suelo
+    const hemiLight = new THREE.HemisphereLight('#ffffff', '#ecd4fc', 1.8);
+    hemiLight.position.set(0, 35, 0);
+    this.scene.add(hemiLight);
 
-    // Rim light: Vibrant pastel pink backlight
-    const rimLight = new THREE.DirectionalLight('#f472b6', 1.8);
-    rimLight.position.set(-20, 15, -25);
+    // 3. Iluminación Cenital Principal (Zenithal / Top-Down Key Sunlight)
+    // Proyecta luz cenital perpendicular directa sobre el personaje y la arena
+    const zenithalLight = new THREE.DirectionalLight('#ffffff', 3.0);
+    zenithalLight.position.set(0, 45, 6);
+    zenithalLight.castShadow = true;
+    zenithalLight.shadow.mapSize.width = 2048;
+    zenithalLight.shadow.mapSize.height = 2048;
+    zenithalLight.shadow.camera.near = 5;
+    zenithalLight.shadow.camera.far = 100;
+    zenithalLight.shadow.camera.left = -30;
+    zenithalLight.shadow.camera.right = 30;
+    zenithalLight.shadow.camera.top = 30;
+    zenithalLight.shadow.camera.bottom = -30;
+    zenithalLight.shadow.bias = -0.0005;
+    this.scene.add(zenithalLight);
+
+    // 4. Luz Frontal y Lateral Cálida para relieve tridimensional
+    const keyFillLight = new THREE.DirectionalLight('#fff5eb', 2.0);
+    keyFillLight.position.set(15, 25, 20);
+    this.scene.add(keyFillLight);
+
+    // 5. Luz de Contorno (Rim Light) Brillante para despegar la silueta del fondo rosado
+    const rimLight = new THREE.DirectionalLight('#f0f9ff', 2.2);
+    rimLight.position.set(-18, 20, -22);
     this.scene.add(rimLight);
 
-    // Player aura point light
-    const playerLight = new THREE.PointLight('#ff3b88', 2.2, 12);
-    playerLight.position.set(0, 2.5, 0);
-    this.playerGroup.add(playerLight);
+    // 6. Luces Cenitales y de Enfoque dedicadas sobre el Jugador (Player Light Rig)
+    // Luz cenital directa sobre el modelo del personaje
+    const playerZenithalSpot = new THREE.DirectionalLight('#ffffff', 2.4);
+    playerZenithalSpot.position.set(0, 16, 1);
+    playerZenithalSpot.target = this.playerGroup;
+    this.playerGroup.add(playerZenithalSpot);
+
+    // Luz frontal para iluminar el rostro, armas y ropajes
+    const playerFrontFill = new THREE.PointLight('#ffffff', 2.2, 18, 1.2);
+    playerFrontFill.position.set(0, 3.2, 4.0);
+    this.playerGroup.add(playerFrontFill);
+
+    // Luz trasera de contorno para destacar los bordes del modelo frente al fondo rosado
+    const playerBackHighlight = new THREE.PointLight('#e0f2fe', 1.8, 14, 1.2);
+    playerBackHighlight.position.set(0, 3.2, -3.8);
+    this.playerGroup.add(playerBackHighlight);
   }
 
   private setupEnvironment() {
@@ -1553,6 +1657,7 @@ export class GameEngine {
     const inner = new THREE.Group();
     // Offset inner parts so that the pistol grip is centered at origin (0, 0, 0)
     inner.position.set(0, 0.24, -0.3);
+    inner.scale.set(0.6, 0.6, 0.6); // Scale down the weapon
     group.add(inner);
 
     const metalDarkMat = new THREE.MeshStandardMaterial({
@@ -1671,7 +1776,7 @@ export class GameEngine {
     drip.position.set(0, 0.95, 0.1);
     group.add(drip);
 
-    group.scale.set(0.9, 0.9, 0.9);
+    group.scale.set(0.6, 0.6, 0.6); // Scale down the machete
     return group;
   }
 
@@ -2202,6 +2307,12 @@ export class GameEngine {
     }
 
     this.stats.totalKills++;
+    this.stats.combo = (this.stats.combo || 0) + 1;
+    setTimeout(() => {
+      this.stats.combo = 0;
+      this.callbacks.onStatsUpdate({ ...this.stats });
+    }, 2000);
+
     const wasReady = this.stats.specialReady;
     const meterBoost = enemy.isBoss ? 40 : 10;
     this.stats.specialMeter = Math.min(100, this.stats.specialMeter + meterBoost);
@@ -2521,6 +2632,7 @@ export class GameEngine {
     this.updateCamera(dt);
 
     // Combat (Aiming & Action Button Fire/Slash)
+    this.isAttacking = !!this.targetEnemy;
     this.updateCombat(dt);
 
     // Update Projectiles
@@ -2544,9 +2656,7 @@ export class GameEngine {
 
   private animatePlayerCharacter(dt: number) {
     if (this.useCustomModel) {
-      if (this.customMixer && this.hasEmbeddedClips) {
-        this.customMixer.update(dt);
-
+      if (this.hasEmbeddedClips) {
         if (this.isMoving) {
           if (this.customRunAction && this.currentCustomAction !== this.customRunAction) {
             this.customRunAction.reset().fadeIn(0.2).play();
@@ -2569,11 +2679,13 @@ export class GameEngine {
         this.animateProceduralCustomSkeleton(dt);
       } else if (this.customModelScene) {
         this.runCycle += dt * (this.isMoving ? 14 : 3);
+        const effectiveScale = this.customModelBaseScale * this.customModelOptions.scale;
+        const baseY = (-this.customModelOriginOffset.rawMinY * effectiveScale) + this.customModelOptions.yOffset;
         if (this.isMoving) {
-          this.customModelScene.position.y = this.customModelOptions.yOffset + Math.abs(Math.sin(this.runCycle)) * 0.08;
+          this.customModelScene.position.y = baseY + Math.abs(Math.sin(this.runCycle)) * 0.08;
           this.customModelScene.rotation.z = Math.sin(this.runCycle) * 0.03;
         } else {
-          this.customModelScene.position.y = this.customModelOptions.yOffset + Math.sin(this.runCycle * 1.5) * 0.02;
+          this.customModelScene.position.y = baseY + Math.sin(this.runCycle * 1.5) * 0.02;
           this.customModelScene.rotation.z = 0;
         }
       }
@@ -2761,16 +2873,17 @@ export class GameEngine {
   private updateCamera(dt: number) {
     const targetCamPos = new THREE.Vector3(
       this.playerPos.x,
-      this.playerPos.y + 4.8,
-      this.playerPos.z + 8.8
+      this.playerPos.y + 4.2,
+      this.playerPos.z + 7.5
     );
 
     this.camera.position.lerp(targetCamPos, Math.min(1, dt * 10));
 
+    // Look directly at character origin / torso coordinates so mesh & bone hierarchy are right in front of camera
     const lookTarget = new THREE.Vector3(
       this.playerPos.x,
-      this.playerPos.y + 2.2,
-      this.playerPos.z - 6.0
+      this.playerPos.y + 1.8,
+      this.playerPos.z
     );
     this.camera.lookAt(lookTarget);
   }
@@ -3017,6 +3130,16 @@ export class GameEngine {
   private animate = () => {
     this.animFrameId = requestAnimationFrame(this.animate);
     const dt = Math.min(0.06, this.clock.getDelta());
+
+    // CRITICAL: Always update animation mixer so character animation plays continuously
+    // even during start screen, pauses, or model preview
+    if (this.customMixer) {
+      this.customMixer.update(dt);
+    }
+
+    // Keep camera smoothly framing the character directly in front of the lens
+    this.updateCamera(dt);
+
     this.update(dt);
     this.renderer.render(this.scene, this.camera);
   };
