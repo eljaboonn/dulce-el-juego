@@ -1,0 +1,6 @@
+{
+  "name": "Candy Apocalypse: Pastel Zombie Hunt",
+  "description": "Juego móvil vertical en tercera persona con joystick central y disparo automático contra hordas de zombies de caramelo y pastel.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

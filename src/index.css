@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+@keyframes drip-stretch {
+  0% {
+    transform: scaleY(0.3) translateY(0);
+    opacity: 0.7;
+  }
+  40% {
+    transform: scaleY(1.3) translateY(4px);
+    opacity: 1;
+  }
+  80% {
+    transform: scaleY(2.1) translateY(14px);
+    opacity: 0.95;
+  }
+  100% {
+    transform: scaleY(0.2) translateY(22px);
+    opacity: 0;
+  }
+}
+
+@keyframes drip-fall {
+  0% {
+    transform: translateY(0) scale(0.6);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(6px) scale(1);
+  }
+  85% {
+    opacity: 0.9;
+    transform: translateY(18px) scale(0.8, 1.4);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(26px) scale(1.6, 0.4);
+  }
+}
+
+@keyframes syrup-ooze {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+  }
+  25% {
+    transform: scale(1.05, 0.95) rotate(2deg);
+  }
+  50% {
+    transform: scale(0.96, 1.04) rotate(-2deg);
+  }
+  75% {
+    transform: scale(1.04, 0.97) rotate(1.5deg);
+  }
+}
+
+@keyframes syrup-drip-glow {
+  0%, 100% {
+    filter: drop-shadow(0 4px 8px rgba(244, 63, 94, 0.7));
+  }
+  50% {
+    filter: drop-shadow(0 6px 16px rgba(244, 63, 94, 0.95)) drop-shadow(0 10px 22px rgba(251, 113, 133, 0.85));
+  }
+}
