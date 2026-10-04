@@ -1,0 +1,9 @@
+{
+  "name": "MotorcityRollPatrol.Terrain",
+  "rootNamespace": "MotorcityRollPatrol.Terrain",
+  "references": [],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "autoReferenced": true
+}
