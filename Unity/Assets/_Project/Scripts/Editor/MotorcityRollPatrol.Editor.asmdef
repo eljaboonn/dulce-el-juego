@@ -1,0 +1,13 @@
+{
+  "name": "MotorcityRollPatrol.Editor",
+  "rootNamespace": "MotorcityRollPatrol.Editor",
+  "references": [
+    "Unity.RenderPipelines.Universal.Runtime"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "autoReferenced": true
+}
