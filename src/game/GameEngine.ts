@@ -1,3 +1,4 @@
+import { PerformanceConfig as Perf } from '../config/performance';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DamageNumber, EnemyType, PlayerStats, RadarBlip, WeaponInfo, WeaponType } from '../types/game';
@@ -251,7 +252,7 @@ export class GameEngine {
     this.clock = new THREE.Clock();
 
     // Fog: Soft dreamy pastel cotton-candy plum fog matching reference art!
-    this.scene.fog = new THREE.FogExp2('#351242', 0.016);
+    this.scene.fog = new THREE.FogExp2('#351242', Perf.fogDensity);
 
     const width = container.clientWidth || 390;
     const height = container.clientHeight || 844;
@@ -259,12 +260,12 @@ export class GameEngine {
     this.camera.position.set(0, 4.2, 7.5);
     this.camera.lookAt(0, 1.8, 0);
 
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
+    this.renderer = new THREE.WebGLRenderer({ antialias: Perf.antialias, alpha: false, powerPreference: Perf.powerPreference, stencil: false });
     this.renderer.setSize(width, height);
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, Perf.maxPixelRatio));
     this.renderer.setClearColor('#2b0e36'); // Vibrant pastel plum sky
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.enabled = Perf.shadows.enabled;
+    this.renderer.shadowMap.type = THREE.BasicShadowMap;
 
     container.appendChild(this.renderer.domElement);
 
@@ -1105,8 +1106,8 @@ export class GameEngine {
     const zenithalLight = new THREE.DirectionalLight('#ffffff', 3.0);
     zenithalLight.position.set(0, 45, 6);
     zenithalLight.castShadow = true;
-    zenithalLight.shadow.mapSize.width = 2048;
-    zenithalLight.shadow.mapSize.height = 2048;
+    zenithalLight.shadow.mapSize.width = Perf.shadows.mapSize;
+    zenithalLight.shadow.mapSize.height = Perf.shadows.mapSize;
     zenithalLight.shadow.camera.near = 5;
     zenithalLight.shadow.camera.far = 100;
     zenithalLight.shadow.camera.left = -30;
